@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シャドバ ランクポイントシミュレーター</title>
+    <!-- Tailwind CSS (デザイン用) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM (動作ロジック用) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel (ブラウザでReactを動かすための変換ツール) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body { 
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: #0f172a; /* fallback */
+        }
+        
+        /* 背景のアニメーション装飾 */
+        .bg-gradient-animate {
+            background: linear-gradient(-45deg, #0f172a, #1e293b, #172554, #1e1b4b);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* 宝石の輝きエフェクト */
+        .gem-glow {
+            box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+        }
+
+        /* 入力フォームのフォーカス時の光 */
+        .input-glow:focus {
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5), 0 0 15px rgba(59, 130, 246, 0.3);
+        }
+    </style>
+</head>
+<body class="text-gray-100 min-h-screen relative overflow-x-hidden bg-gradient-animate">
+
+    <!-- 背景の装飾的な光 -->
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[100px]"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[100px]"></div>
+    </div>
+
+    <!-- ここにReactアプリが描画されます -->
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        // アイコンコンポーネント
+        const CalculatorIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>
+            </svg>
+        );
+
+        const RotateCcwIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+            </svg>
+        );
+
+        const InfoIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+            </svg>
+        );
+
+        const ChevronDownIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="m6 9 6 6 6-6"/>
+            </svg>
+        );
+
+        // メインアプリケーション
+        function App() {
+            // D4〜D8の入力値を管理するステート
+            const [inputs, setInputs] = useState({
+                d4: 0,
+                d5: 0,
+                d6: 0,
+                d7: 0,
+                d8: 0,
+            });
+
+            // 解説セクションの開閉状態
+            const [isInfoOpen, setIsInfoOpen] = useState(false);
+
+            // 入力値が変更されたときの処理
+            const handleChange = (key, value) => {
+                const numValue = parseFloat(value);
+                setInputs(prev => ({
+                    ...prev,
+                    [key]: isNaN(numValue) ? 0 : numValue
+                }));
+            };
+
+            // リセット処理
+            const handleReset = () => {
+                setInputs({ d4: 0, d5: 0, d6: 0, d7: 0, d8: 0 });
+            };
+
+            // 計算ロジック
+            const results = useMemo(() => {
+                const { d4, d5, d6, d7, d8 } = inputs;
+
+                // ② 累計獲得pt: 単純合計
+                const ruikeiKakutokuPt = d4 + d5 + d6 + d7 + d8;
+
+                // ③ 割合ポイント: 重みづけ合計
+                const wariaiPoint = 
+                    (d4 * (35 / 25)) + 
+                    (d5 * (22 / 25)) + 
+                    (d6 * (15 / 25)) + 
+                    (d7 * (7 / 25)) + 
+                    (d8 * (1 / 25));
+
+                // ④ 累計乗数: 初期値0.05, 2000ptごとに0.05加算, 最小0.05, 最大20
+                const calcJosu = (Math.floor(ruikeiKakutokuPt / 2000) * 0.05) + 0.05;
+                const ruikeiJosu = Math.min(20, Math.max(0.05, calcJosu));
+
+                // ⑤ ランクポイント
+                const rankPoint = wariaiPoint * ruikeiJosu;
+
+                return {
+                    ruikeiKakutokuPt,
+                    wariaiPoint,
+                    ruikeiJosu,
+                    rankPoint
+                };
+            }, [inputs]);
+
+            // 色定義
+            const cellColors = {
+                d4: '#F2CEEF',
+                d5: '#8AB8E6',
+                d6: '#FF8181',
+                d7: '#FFD03B',
+                d8: '#8ED973',
+            };
+
+            return (
+                <div className="min-h-screen p-4 md:p-8 flex flex-col items-center justify-center">
+                    <div className="w-full max-w-4xl space-y-6">
+                        
+                        {/* メイン計算機カード */}
+                        <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-xl shadow-2xl overflow-hidden ring-1 ring-white/10">
+                            {/* Header */}
+                            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700 p-6 flex items-center justify-between relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-50"></div>
+                                <div className="flex items-center gap-4 z-10">
+                                    <div className="p-2 bg-slate-800 rounded-lg shadow-inner border border-slate-600">
+                                        <CalculatorIcon className="w-8 h-8 text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-200" style={{ textShadow: '0 2px 10px rgba(59, 130, 246, 0.3)' }}>
+                                            シャドバ ランクポイントシミュレーター
+                                        </h1>
+                                        <p className="text-slate-400 text-xs md:text-sm tracking-wide">数値を入力して各ポイントを算出</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-6 md:p-8 grid md:grid-cols-2 gap-8">
+                                
+                                {/* ① 入力エリア */}
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h2 className="text-lg font-bold text-blue-200 border-l-4 border-blue-500 pl-3 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                                            入力エリア
+                                        </h2>
+                                        <button 
+                                            onClick={handleReset}
+                                            className="flex items-center gap-1 text-sm text-slate-400 hover:text-red-400 transition-colors duration-300"
+                                        >
+                                            <RotateCcwIcon className="w-4 h-4" />
+                                            リセット
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <InputRow id="d4" label="ダイアモンド" iconChar="D" color={cellColors.d4} value={inputs.d4} onChange={handleChange} />
+                                        <InputRow id="d5" label="サファイア" iconChar="S" color={cellColors.d5} value={inputs.d5} onChange={handleChange} />
+                                        <InputRow id="d6" label="ルビー" iconChar="R" color={cellColors.d6} value={inputs.d6} onChange={handleChange} />
+                                        <InputRow id="d7" label="トパーズ" iconChar="T" color={cellColors.d7} value={inputs.d7} onChange={handleChange} />
+                                        <InputRow id="d8" label="エメラルド" iconChar="E" color={cellColors.d8} value={inputs.d8} onChange={handleChange} />
+                                    </div>
+                                    
+                                    <p className="text-xs text-slate-500 mt-4 border-t border-slate-700/50 pt-4">
+                                        ※各項目に任意の数値を入力してください。
+                                    </p>
+                                </div>
+
+                                {/* 結果エリア */}
+                                <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50 relative">
+                                    <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-green-500/10 to-transparent rounded-tr-xl pointer-events-none"></div>
+                                    
+                                    <h2 className="text-lg font-bold text-green-200 border-l-4 border-green-500 pl-3 mb-6 shadow-[0_0_10px_rgba(34,197,94,0.2)]">
+                                        計算結果
+                                    </h2>
+
+                                    <div className="space-y-5">
+                                        {/* ② 累計獲得pt */}
+                                        <ResultCard 
+                                            title="累計獲得pt" 
+                                            value={results.ruikeiKakutokuPt.toLocaleString()} 
+                                            subValue="単純合計値"
+                                            colorClass="text-gray-100"
+                                            borderColor="border-slate-600"
+                                        />
+
+                                        {/* ③ 割合ポイント */}
+                                        <ResultCard 
+                                            title="割合ポイント" 
+                                            value={results.wariaiPoint.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
+                                            subValue="重み付け合計"
+                                            colorClass="text-blue-300"
+                                            borderColor="border-blue-500/30"
+                                            glowClass="shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+                                        />
+
+                                        {/* ④ 累計乗数 */}
+                                        <ResultCard 
+                                            title="累計乗数" 
+                                            value={results.ruikeiJosu.toFixed(2)} 
+                                            subValue="倍率 (Max 20.00)"
+                                            colorClass="text-purple-300"
+                                            borderColor="border-purple-500/30"
+                                            glowClass="shadow-[0_0_15px_rgba(168,85,247,0.1)]"
+                                        />
+
+                                        {/* ⑤ ランクポイント */}
+                                        <div className="mt-8 pt-6 border-t border-slate-600 relative overflow-hidden group">
+                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out pointer-events-none"></div>
+                                            <p className="text-sm text-slate-400 font-bold mb-1 uppercase tracking-widest">ランクポイント (最終結果)</p>
+                                            <div className="text-5xl font-black text-white tracking-tighter drop-shadow-lg flex items-baseline">
+                                                {results.rankPoint.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                                <span className="text-xl font-normal text-slate-400 ml-2">pt</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 解説セクション（アコーディオン） */}
+                        <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/50 rounded-xl overflow-hidden ring-1 ring-white/5">
+                            <button 
+                                onClick={() => setIsInfoOpen(!isInfoOpen)}
+                                className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors text-left group"
+                            >
+                                <div className="flex items-center gap-2 text-slate-300 font-semibold group-hover:text-white transition-colors">
+                                    <InfoIcon className="w-5 h-5 text-blue-400" />
+                                    <span>このシミュレーターと用語について</span>
+                                </div>
+                                <ChevronDownIcon className={`w-5 h-5 text-slate-500 transition-transform duration-300 ${isInfoOpen ? 'rotate-180 text-blue-400' : ''}`} />
+                            </button>
+                            
+                            <div className={`transition-all duration-300 ease-in-out ${isInfoOpen ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                                <div className="p-6 border-t border-slate-700/50 text-sm md:text-base text-slate-300 space-y-6 bg-slate-950/30">
+                                    
+                                    <div>
+                                        <h3 className="font-bold text-lg mb-2 flex items-center gap-2 text-white">
+                                            <span className="w-1 h-6 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span>
+                                            ランクシミュレーターとは
+                                        </h3>
+                                        <p className="text-slate-400 leading-relaxed pl-3">
+                                            Shadowverse（シャドバ）における「グループ割合」と「累計獲得ポイント」の2つの指標を統合し、プレイヤーのランク強度を定量化（数値化）する試みです。<br/>
+                                            <span className="text-xs text-slate-500">※現在試験的な運用であり、多くの課題が残っています。</span>
+                                        </p>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-3 gap-6">
+                                        <div className="bg-slate-800/50 p-4 rounded-lg border border-blue-900/30 hover:border-blue-500/30 transition-colors">
+                                            <h4 className="font-bold text-blue-300 mb-2">割合ポイント</h4>
+                                            <p className="text-slate-400 text-sm leading-relaxed">
+                                                ゲーム内の「グループ割合」を基準に、各ランク帯（エメラルド〜ダイアモンド）に重み付けを行った数値です。
+                                                分母を25とし、上位ランクほど高く設定されています。
+                                            </p>
+                                            <div className="mt-3 flex flex-wrap gap-1 text-xs text-blue-200 font-mono">
+                                                <span className="bg-blue-900/50 border border-blue-500/30 px-1.5 py-0.5 rounded">ダ:35</span>
+                                                <span className="bg-blue-900/50 border border-blue-500/30 px-1.5 py-0.5 rounded">サ:22</span>
+                                                <span className="bg-blue-900/50 border border-blue-500/30 px-1.5 py-0.5 rounded">ル:15</span>
+                                                <span className="bg-blue-900/50 border border-blue-500/30 px-1.5 py-0.5 rounded">ト:7</span>
+                                                <span className="bg-blue-900/50 border border-blue-500/30 px-1.5 py-0.5 rounded">エ:1</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-slate-800/50 p-4 rounded-lg border border-purple-900/30 hover:border-purple-500/30 transition-colors">
+                                            <h4 className="font-bold text-purple-300 mb-2">累計乗数</h4>
+                                            <p className="text-slate-400 text-sm leading-relaxed">
+                                                「累計獲得pt」を倍率として換算したものです。プレイ量の積み重ねを評価するため、2,000pt獲得ごとに0.05ずつ加算されます。
+                                            </p>
+                                            <div className="mt-3 text-xs text-purple-200 font-mono">
+                                                初期値 0.05 / 最大 20.00
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-slate-800/50 p-4 rounded-lg border border-green-900/30 hover:border-green-500/30 transition-colors">
+                                            <h4 className="font-bold text-green-300 mb-2">ランクポイント</h4>
+                                            <p className="text-slate-400 text-sm leading-relaxed">
+                                                「割合ポイント（質）」と「累計乗数（量）」を掛け合わせた最終スコアです。
+                                                シャドバにおける総合的な強さと実績をひとつの数値で表しています。
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            );
+        }
+
+        // サブコンポーネント: 入力行
+        function InputRow({ id, label, iconChar, color, value, onChange }) {
+            return (
+                <div className="flex items-center gap-4 group">
+                    <div className="w-1 h-full rounded-full shadow-[0_0_8px_currentColor]" style={{ backgroundColor: color, color: color }}></div>
+                    <div className="flex-1">
+                        <label htmlFor={id} className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider group-hover:text-slate-200 transition-colors">
+                            {label}
+                        </label>
+                        <div className="relative flex items-center">
+                            <div 
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mr-3 shadow-lg border border-white/20 text-slate-900 gem-glow"
+                                style={{ backgroundColor: color, color: '#1e293b' }}
+                            >
+                                {iconChar}
+                            </div>
+                            <input
+                                type="number"
+                                id={id}
+                                value={value === 0 ? '' : value}
+                                placeholder="0"
+                                onChange={(e) => onChange(id, e.target.value)}
+                                className="w-full bg-slate-800/50 border border-slate-600 text-white text-lg rounded-lg focus:ring-blue-500 focus:border-blue-500 input-glow block p-2.5 transition-all outline-none placeholder-slate-600"
+                            />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // サブコンポーネント: 結果カード
+        function ResultCard({ title, value, subValue, colorClass, borderColor = 'border-slate-700', glowClass = '' }) {
+            return (
+                <div className={`bg-slate-900 p-4 rounded-lg border ${borderColor} flex justify-between items-center transition-all duration-300 ${glowClass} hover:bg-slate-800`}>
+                    <div>
+                        <p className="text-sm font-medium text-slate-400">{title}</p>
+                        <p className="text-xs text-slate-500 mt-1">{subValue}</p>
+                    </div>
+                    <div className={`text-2xl font-bold ${colorClass} drop-shadow-sm`}>
+                        {value}
+                    </div>
+                </div>
+            );
+        }
+
+        // アプリケーションの描画
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
